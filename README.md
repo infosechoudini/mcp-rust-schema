@@ -18,7 +18,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mcp_rust_schema = "0.1.2"
+mcp_rust_schema = "0.1.4"
 ```
 
 ## Usage
