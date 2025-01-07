@@ -23,15 +23,11 @@ jobs:
         run: cargo test --verbose
 
   publish:
-    name: Publish to crates.io
+    name: Cargo Publish
+    uses: ryohidaka/action-cargo-publish@be41ba19145bd21857b40009c3fc6512748be4be
+    with:
+      # The token to publish to crates.io.
+      token: ${{ secrets.CRATES_TOKEN }}
+      # If true, run cargo publish with the --dry-run flag.
+      dry-run: true
     needs: [test]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Publish
-        run: cargo publish --token ${CRATES_TOKEN}
-        env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
