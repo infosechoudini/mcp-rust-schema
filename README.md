@@ -8,7 +8,7 @@ A Rust implementation of the Model Context Protocol (MCP) schema, providing type
 ## Features
 
 - 🔍 Complete type definitions for MCP messages and data structures
-- 🚀 JSON-RPC 2.0 protocol implementation
+- 🚀 JSON-RPC 2.0 message schema support
 - ✅ Schema validation against the MCP specification
 - 📦 Serialization/deserialization support via serde
 
