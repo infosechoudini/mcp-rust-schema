@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::error::{Error, ErrorCode};
+use crate::types::{RequestMeta, ResponseMeta, NotificationMeta};
 
 pub const LATEST_PROTOCOL_VERSION: &str = "2024-11-05";
 pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &[LATEST_PROTOCOL_VERSION, "2024-10-07"];
@@ -23,6 +24,8 @@ pub struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<serde_json::Value>,
     pub id: RequestId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<RequestMeta>,
 }
 
 /// Base JSON-RPC notification structure
@@ -32,6 +35,8 @@ pub struct Notification {
     pub method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<NotificationMeta>,
 }
 
 /// Base JSON-RPC response structure
@@ -43,6 +48,8 @@ pub struct Response {
     pub result: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ResponseError>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<ResponseMeta>,
 }
 
 /// JSON-RPC error object
@@ -55,42 +62,46 @@ pub struct ResponseError {
 }
 
 impl Request {
-    pub fn new(method: impl Into<String>, params: Option<serde_json::Value>, id: RequestId) -> Self {
+    pub fn new(method: impl Into<String>, params: Option<serde_json::Value>, id: RequestId, meta: Option<RequestMeta>) -> Self {
         Self {
-            jsonrpc: crate::JSONRPC_VERSION.to_string(),
+            jsonrpc: JSONRPC_VERSION.to_string(),
             method: method.into(),
             params,
             id,
+            meta,
         }
     }
 }
 
 impl Notification {
-    pub fn new(method: impl Into<String>, params: Option<serde_json::Value>) -> Self {
+    pub fn new(method: impl Into<String>, params: Option<serde_json::Value>, meta: Option<NotificationMeta>) -> Self {
         Self {
-            jsonrpc: crate::JSONRPC_VERSION.to_string(),
+            jsonrpc: JSONRPC_VERSION.to_string(),
             method: method.into(),
             params,
+            meta,
         }
     }
 }
 
 impl Response {
-    pub fn success(id: RequestId, result: Option<serde_json::Value>) -> Self {
+    pub fn success(id: RequestId, result: Option<serde_json::Value>, meta: Option<ResponseMeta>) -> Self {
         Self {
-            jsonrpc: crate::JSONRPC_VERSION.to_string(),
+            jsonrpc: JSONRPC_VERSION.to_string(),
             id,
             result,
             error: None,
+            meta,
         }
     }
 
-    pub fn error(id: RequestId, error: ResponseError) -> Self {
+    pub fn error(id: RequestId, error: ResponseError, meta: Option<ResponseMeta>) -> Self {
         Self {
-            jsonrpc: crate::JSONRPC_VERSION.to_string(),
+            jsonrpc: JSONRPC_VERSION.to_string(),
             id,
             result: None,
             error: Some(error),
+            meta,
         }
     }
 }
@@ -149,7 +160,7 @@ mod tests {
     fn test_request_creation() {
         let id = RequestId::Number(1);
         let params = Some(json!({"key": "value"}));
-        let request = Request::new("test_method", params.clone(), id.clone());
+        let request = Request::new("test_method", params.clone(), id.clone(), None);
         
         assert_eq!(request.jsonrpc, JSONRPC_VERSION);
         assert_eq!(request.method, "test_method");
@@ -160,7 +171,7 @@ mod tests {
     #[test]
     fn test_notification_creation() {
         let params = Some(json!({"event": "update"}));
-        let notification = Notification::new("test_event", params.clone());
+        let notification = Notification::new("test_event", params.clone(), None);
         
         assert_eq!(notification.jsonrpc, JSONRPC_VERSION);
         assert_eq!(notification.method, "test_event");
@@ -171,7 +182,7 @@ mod tests {
     fn test_response_success() {
         let id = RequestId::String("test-1".to_string());
         let result = Some(json!({"status": "ok"}));
-        let response = Response::success(id.clone(), result.clone());
+        let response = Response::success(id.clone(), result.clone(), None);
         
         assert_eq!(response.jsonrpc, JSONRPC_VERSION);
         assert_eq!(response.id, id);
@@ -187,7 +198,7 @@ mod tests {
             message: "Invalid Request".to_string(),
             data: Some(json!({"details": "missing method"})),
         };
-        let response = Response::error(id.clone(), error.clone());
+        let response = Response::error(id.clone(), error.clone(), None);
         
         assert_eq!(response.jsonrpc, JSONRPC_VERSION);
         assert_eq!(response.id, id);

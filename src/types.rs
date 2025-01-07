@@ -2,7 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A progress token, used to associate progress notifications with the original request
-pub type ProgressToken = String;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ProgressToken {
+    String(String),
+    Number(i64),
+}
 
 /// An opaque token used to represent a cursor for pagination
 pub type Cursor = String;
@@ -14,6 +19,13 @@ pub struct RequestMeta {
     pub progress_token: Option<ProgressToken>,
 }
 
+/// Base response metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponseMeta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom: Option<HashMap<String, serde_json::Value>>,
+}
+
 /// Base notification metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationMeta {
@@ -21,27 +33,140 @@ pub struct NotificationMeta {
     pub custom: Option<HashMap<String, serde_json::Value>>,
 }
 
-/// Progress information
+/// Role types for messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Progress {
-    /// The progress thus far
-    pub progress: u64,
-    /// Optional total progress
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total: Option<u64>,
-    /// Optional message describing the progress
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    Assistant,
+    User,
+}
+
+/// Content types for messages
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum MessageContent {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "image")]
+    Image { 
+        data: String,
+        mime_type: String,
+    },
+    #[serde(rename = "resource")]
+    Resource { resource: ResourceContents },
 }
 
 /// Resource contents
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum ResourceContents {
-    #[serde(rename = "text")]
-    Text { text: String },
-    #[serde(rename = "blob")]
-    Blob { data: Vec<u8> },
+    Text {
+        text: String,
+        uri: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mime_type: Option<String>,
+    },
+    Blob {
+        data: String,
+        uri: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mime_type: Option<String>,
+    },
+}
+
+/// A message in a prompt or sampling context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Message {
+    pub role: Role,
+    pub content: Vec<MessageContent>,
+}
+
+/// Model preferences for completion requests
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPreferences {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_priority: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed_priority: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_priority: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hints: Option<Vec<ModelHint>>,
+}
+
+/// Model hint for selection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelHint {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Client/Server implementation information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Implementation {
+    pub name: String,
+    pub version: String,
+}
+
+/// Client capabilities
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ClientCapabilities {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roots: Option<RootsCapability>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sampling: Option<HashMap<String, serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub experimental: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RootsCapability {
+    pub list_changed: bool,
+}
+
+/// Server capabilities
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ServerCapabilities {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logging: Option<HashMap<String, serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompts: Option<PromptsCapability>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resources: Option<ResourcesCapability>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<ToolsCapability>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub experimental: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptsCapability {
+    pub list_changed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourcesCapability {
+    pub list_changed: bool,
+    pub subscribe: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolsCapability {
+    pub list_changed: bool,
+}
+
+/// Logging levels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LoggingLevel {
+    Emergency,
+    Alert,
+    Critical,
+    Error,
+    Warning,
+    Notice,
+    Info,
+    Debug,
 }
 
 /// A resource in the system
@@ -56,75 +181,10 @@ pub struct Resource {
     pub description: Option<String>,
     /// Resource contents
     pub contents: ResourceContents,
-}
-
-/// Model preferences for completion requests
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelPreferences {
-    /// Optional model name
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    /// Optional temperature (0.0 - 1.0)
+    pub mime_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>,
-    /// Optional maximum number of tokens
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<u32>,
-}
-
-/// A completion result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Completion {
-    /// The completion text
-    pub text: String,
-    /// Optional score/confidence (0.0 - 1.0)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub score: Option<f32>,
-}
-
-/// Client implementation information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Implementation {
-    /// Name of the implementation
-    pub name: String,
-    /// Version of the implementation
-    pub version: String,
-}
-
-/// Client capabilities
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ClientCapabilities {
-    /// Optional custom capabilities
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<HashMap<String, serde_json::Value>>,
-}
-
-/// Server capabilities
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ServerCapabilities {
-    /// Optional custom capabilities
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom: Option<HashMap<String, serde_json::Value>>,
-}
-
-/// Logging levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LoggingLevel {
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
-}
-
-/// A prompt argument
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PromptArgument {
-    pub name: String,
-    pub description: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_value: Option<String>,
+    pub annotations: Option<Annotations>,
 }
 
 /// A prompt definition
@@ -137,39 +197,15 @@ pub struct Prompt {
     pub arguments: Option<Vec<PromptArgument>>,
 }
 
-/// Content types for prompt messages
+/// Prompt argument
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum MessageContent {
-    #[serde(rename = "text")]
-    Text { text: String },
-    #[serde(rename = "image")]
-    Image { uri: String, alt_text: Option<String> },
-    #[serde(rename = "resource")]
-    Resource { resource: Resource },
-}
-
-/// A prompt message
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PromptMessage {
-    pub role: String,
-    pub content: Vec<MessageContent>,
-}
-
-/// A tool definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tool {
+pub struct PromptArgument {
     pub name: String,
     pub description: String,
-    pub schema: serde_json::Value,
-}
-
-/// Root definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Root {
-    pub id: String,
-    pub name: String,
-    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 /// Initialize request
@@ -233,5 +269,61 @@ pub struct CompleteRequest {
 /// Complete result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompleteResult {
-    pub completion: Completion,
+    pub completion: Vec<String>,
+    pub has_more: Option<bool>,
+    pub total: Option<i32>,
+}
+
+/// A tool definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tool {
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+}
+
+/// Root definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Root {
+    pub uri: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// A completion result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Completion {
+    pub text: String,
+    pub stop_reason: Option<String>,
+}
+
+/// Progress information for long-running operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Progress {
+    pub progress: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<f64>,
+}
+
+/// A prompt message
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptMessage {
+    pub role: Role,
+    pub content: Vec<MessageContent>,
+}
+
+/// A sampling message
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SamplingMessage {
+    pub role: Role,
+    pub content: MessageContent,
+}
+
+/// Add required capability for annotations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Annotations {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audience: Option<Vec<Role>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<f32>,
 }
