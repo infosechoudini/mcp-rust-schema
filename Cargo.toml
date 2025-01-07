@@ -8,6 +8,17 @@ repository = "https://github.com/infosechoudini/mcp-rust-schema"
 documentation = "https://github.com/infosechoudini/mcp-rust-schema"
 keywords = ["mcp", "schema", "protocol", "machine-learning", "ai"]
 publish = true
+exclude = [
+    ".github/*",
+    ".gitignore",
+    "tests/*",
+    ".env*",
+    "*.swp",
+    "*.swo",
+    ".DS_Store",
+    ".vscode/*",
+    ".idea/*",
+]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
