@@ -1,6 +1,6 @@
 [package]
 name = "mcp_rust_schema"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Rust Schema for the Model Context Protocol (MCP)"
 license = "MIT"
