@@ -1,21 +1,16 @@
-# Model Context Protocol (MCP) Rust SDK
+# Model Context Protocol (MCP) Rust Schema
 
-> ⚠️ **Warning**: This SDK is currently a work in progress and is not ready for production use.
+A Rust implementation of the Model Context Protocol (MCP) schema, providing type definitions and validation for MCP messages.
 
-A Rust implementation of the Model Context Protocol (MCP), designed for seamless communication between AI models and their runtime environments.
-
-[![Rust CI/CD](https://github.com/Derek-X-Wang/mcp-rust-sdk/actions/workflows/rust.yml/badge.svg)](https://github.com/Derek-X-Wang/mcp-rust-sdk/actions/workflows/rust.yml)
-[![crates.io](https://img.shields.io/crates/v/mcp_rust_sdk.svg)](https://crates.io/crates/mcp_rust_sdk)
-[![Documentation](https://docs.rs/mcp_rust_sdk/badge.svg)](https://docs.rs/mcp_rust_sdk)
+[![crates.io](https://img.shields.io/crates/v/mcp_rust_schema.svg)](https://crates.io/crates/mcp_rust_schema)
+[![Documentation](https://docs.rs/mcp_rust_schema/badge.svg)](https://docs.rs/mcp_rust_schema)
 
 ## Features
 
-- 🚀 Full implementation of MCP protocol specification
-- 🔄 Multiple transport layers (WebSocket, stdio)
-- ⚡ Async/await support using Tokio
-- 🛡️ Type-safe message handling
-- 🔍 Comprehensive error handling
-- 📦 Zero-copy serialization/deserialization
+- 🔍 Complete type definitions for MCP messages and data structures
+- 🚀 JSON-RPC 2.0 protocol implementation
+- ✅ Schema validation against the MCP specification
+- 📦 Serialization/deserialization support via serde
 
 ## Installation
 
@@ -23,75 +18,67 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mcp_rust_sdk = "0.1.0"
+mcp_rust_schema = "0.1.0"
 ```
 
-## Quick Start
+## Usage
 
-### Client Example
+### Basic Message Creation
 
 ```rust
-use mcp_rust_sdk::{Client, transport::WebSocketTransport};
+use mcp_rust_schema::protocol::{Request, RequestId};
+use mcp_rust_schema::types::RequestMeta;
+use serde_json::json;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create a WebSocket transport
-    let transport = WebSocketTransport::new("ws://localhost:8080").await?;
-    
-    // Create and connect the client
-    let client = Client::new(transport);
-    client.connect().await?;
-    
-    // Make requests
-    let response = client.request("method_name", Some(params)).await?;
-    
-    Ok(())
-}
+// Create a new request
+let request = Request::new(
+    "test/method",
+    Some(json!({"key": "value"})),
+    RequestId::String("test-1".to_string()),
+    Some(RequestMeta {
+        progress_token: None,
+    }),
+);
 ```
 
-### Server Example
+### Schema Validation
 
 ```rust
-use mcp_rust_sdk::{Server, transport::StdioTransport};
+use mcp_rust_schema::types::Resource;
+use serde_json::json;
+use jsonschema::Validator;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create a stdio transport
-    let (transport, _) = StdioTransport::new();
-    
-    // Create and start the server
-    let server = Server::new(transport);
-    server.start().await?;
-    
-    Ok(())
-}
+// Create a resource
+let resource = Resource {
+    uri: "file:///test.txt".to_string(),
+    title: "Test File".to_string(),
+    description: Some("A test file".to_string()),
+    contents: ResourceContents::Text {
+        text: "Hello World".to_string(),
+        uri: "file:///test.txt".to_string(),
+        mime_type: Some("text/plain".to_string()),
+    },
+    mime_type: Some("text/plain".to_string()),
+    annotations: None,
+};
+
+// Validate against schema
+let resource_json = serde_json::to_value(resource)?;
+let validator = jsonschema::validator_for(&schema)?;
+assert!(validator.is_valid(&resource_json));
 ```
-
-## Transport Layers
-
-The SDK supports multiple transport layers:
-
-### WebSocket Transport
-- Ideal for network-based communication
-- Supports both secure (WSS) and standard (WS) connections
-- Built-in reconnection handling
-
-### stdio Transport
-- Perfect for local process communication
-- Lightweight and efficient
-- Great for command-line tools and local development
 
 ## Error Handling
 
-The SDK provides comprehensive error handling through the `Error` type:
+The library provides comprehensive error handling:
 
 ```rust
-use mcp_rust_sdk::Error;
+use mcp_rust_schema::error::Error;
 
 match result {
     Ok(value) => println!("Success: {:?}", value),
-    Err(Error::Protocol(code, msg)) => println!("Protocol error {}: {}", code, msg),
-    Err(Error::Transport(e)) => println!("Transport error: {}", e),
+    Err(Error::Protocol { code, message, .. }) => println!("Protocol error {}: {}", code, message),
+    Err(Error::Serialization(e)) => println!("Serialization error: {}", e),
     Err(e) => println!("Other error: {}", e),
 }
 ```
@@ -99,3 +86,13 @@ match result {
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
